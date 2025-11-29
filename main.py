@@ -43,7 +43,19 @@ async def crop_flipkart_label(file: UploadFile = File(...)):
     LABEL_X1_PERCENT = 0.63   # right side of label
     LABEL_Y1_PERCENT = 0.92   # top of label
 
-    def get_label_rect(page):
+   # -----------------------------
+# LABEL CROP CONFIG (TUNE HERE)
+# -----------------------------
+# 0.0 = left / top edge of original page
+# 1.0 = right / bottom edge of original page
+# These values are tuned to the red-box label you showed in Paint.
+LABEL_X0_PERCENT = 0.32   # left edge of label
+LABEL_X1_PERCENT = 0.68   # right edge of label
+LABEL_Y0_PERCENT = 0.07   # top edge of label
+LABEL_Y1_PERCENT = 0.49   # bottom edge of label
+
+
+def get_label_rect(page):
     """
     Return the rectangle (in page coordinates) that contains ONLY the shipping label.
     Adjust the four LABEL_*_PERCENT constants above to fine-tune.
@@ -59,6 +71,7 @@ async def crop_flipkart_label(file: UploadFile = File(...)):
     y1 = page_height * LABEL_Y1_PERCENT
 
     return fitz.Rect(x0, y0, x1, y1)
+
 
     # Process each page
     for page_index in range(len(src_doc)):
