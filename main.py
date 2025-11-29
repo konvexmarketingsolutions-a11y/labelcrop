@@ -22,10 +22,10 @@ app.add_middleware(
 # 0.0 = left / top edge of original page
 # 1.0 = right / bottom edge of original page
 # Start with these; we can tweak after it's returning a valid PDF.
-LABEL_X0_PERCENT = 0.27   # move left edge slightly left
-LABEL_X1_PERCENT = 0.73   # move right edge slightly right
-LABEL_Y0_PERCENT = 0.05   # top stays almost same
-LABEL_Y1_PERCENT = 0.37   # move bottom UP to remove invoice strip
+LABEL_X0_PERCENT = 0.27
+LABEL_X1_PERCENT = 0.72
+LABEL_Y0_PERCENT = 0.04
+LABEL_Y1_PERCENT = 0.42
 
 def get_label_rect(page: fitz.Page) -> fitz.Rect:
     """
