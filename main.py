@@ -44,18 +44,21 @@ async def crop_flipkart_label(file: UploadFile = File(...)):
     LABEL_Y1_PERCENT = 0.92   # top of label
 
     def get_label_rect(page):
-        """Return the rectangle of the shipping label on the original page."""
-        page_rect = page.rect
-        page_width = page_rect.width
-        page_height = page_rect.height
+    """
+    Return the rectangle (in page coordinates) that contains ONLY the shipping label.
+    Adjust the four LABEL_*_PERCENT constants above to fine-tune.
+    """
+    page_rect = page.rect
+    page_width = page_rect.width
+    page_height = page_rect.height
 
-        x0 = page_width  * LABEL_X0_PERCENT
-        y0 = page_height * LABEL_Y0_PERCENT
-        x1 = page_width  * LABEL_X1_PERCENT
-        y1 = page_height * LABEL_Y1_PERCENT
+    # In PyMuPDF, (0,0) is TOP-LEFT and y increases downwards.
+    x0 = page_width  * LABEL_X0_PERCENT
+    y0 = page_height * LABEL_Y0_PERCENT
+    x1 = page_width  * LABEL_X1_PERCENT
+    y1 = page_height * LABEL_Y1_PERCENT
 
-        return fitz.Rect(x0, y0, x1, y1)
-
+    return fitz.Rect(x0, y0, x1, y1)
 
     # Process each page
     for page_index in range(len(src_doc)):
