@@ -5,16 +5,55 @@ import fitz  # PyMuPDF
 
 app = FastAPI()
 
-# CORS – allow all origins (simple + safe for this tool)
+# CORS – allow all origins (no cookies needed)
 origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=False,   # no cookies/credentials needed
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# -------------------------------------------------
+# LABEL CROP CONFIG (these four numbers are the key)
+# -------------------------------------------------
+# 0.0 = left / top edge of original page
+# 1.0 = right / bottom edge of original page
+# Tuned to your red box (Flipkart label in the screenshot).
+LABEL_X0_PERCENT = 0.30   # left edge of label
+LABEL_X1_PERCENT = 0.70   # right edge of label
+LABEL_Y0_PERCENT = 0.08   # top edge of label
+LABEL_Y1_PERCENT = 0.52   # bottom edge of label
+
+
+def get_label_rect(page: fitz.Page) -> fitz.Rect:
+    """
+    Return the rectangle (page coordinates) that contains ONLY the shipping label.
+    Adjust LABEL_*_PERCENT constants above if needed.
+    PyMuPDF page.rect: (0, 0, width, height) with origin at TOP-LEFT, y increasing downwards.
+    """
+    page_rect = page.rect
+    page_width = page_rect.width
+    page_height = page_rect.height
+
+    x0 = page_width * LABEL_X0_PERCENT
+    y0 = page_height * LABEL_Y0_PERCENT
+    x1 = page_width * LABEL_X1_PERCENT
+    y1 = page_height * LABEL_Y1_PERCENT
+
+    # Ensure rect is valid and inside page bounds
+    x0 = max(0, min(x0, page_width))
+    x1 = max(0, min(x1, page_width))
+    y0 = max(0, min(y0, page_height))
+    y1 = max(0, min(y1, page_height))
+
+    if x1 <= x0 or y1 <= y0:
+        return fitz.Rect(0, 0, 0, 0)  # empty rect
+
+    return fitz.Rect(x0, y0, x1, y1)
+
 
 @app.post("/crop/flipkart-label")
 async def crop_flipkart_label(file: UploadFile = File(...)):
@@ -30,81 +69,59 @@ async def crop_flipkart_label(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Could not open PDF.")
 
     # 4×6 inches in PDF points (1 inch = 72 pt)
-    LABEL_WIDTH_PT = 4 * 72
-    LABEL_HEIGHT_PT = 6 * 72
+    LABEL_WIDTH_PT = 4 * 72   # 288
+    LABEL_HEIGHT_PT = 6 * 72  # 432
 
     out_doc = fitz.open()
+    pages_added = 0
 
-       # ---- DEFINE LABEL AREA AS PERCENTAGES OF THE PAGE ----
-    # You can tweak these 4 numbers to fine-tune the crop area.
-    # 0.0 = left/bottom edge, 1.0 = right/top edge of original A4 page.
-    LABEL_X0_PERCENT = 0.03   # left side of label
-    LABEL_Y0_PERCENT = 0.32   # bottom of label
-    LABEL_X1_PERCENT = 0.63   # right side of label
-    LABEL_Y1_PERCENT = 0.92   # top of label
-
-   # -----------------------------
-# LABEL CROP CONFIG (TUNE HERE)
-# -----------------------------
-# 0.0 = left / top edge of original page
-# 1.0 = right / bottom edge of original page
-# These values are tuned to the red-box label you showed in Paint.
-LABEL_X0_PERCENT = 0.32   # left edge of label
-LABEL_X1_PERCENT = 0.68   # right edge of label
-LABEL_Y0_PERCENT = 0.07   # top edge of label
-LABEL_Y1_PERCENT = 0.49   # bottom edge of label
-
-
-def get_label_rect(page):
-    """
-    Return the rectangle (in page coordinates) that contains ONLY the shipping label.
-    Adjust the four LABEL_*_PERCENT constants above to fine-tune.
-    """
-    page_rect = page.rect
-    page_width = page_rect.width
-    page_height = page_rect.height
-
-    # In PyMuPDF, (0,0) is TOP-LEFT and y increases downwards.
-    x0 = page_width  * LABEL_X0_PERCENT
-    y0 = page_height * LABEL_Y0_PERCENT
-    x1 = page_width  * LABEL_X1_PERCENT
-    y1 = page_height * LABEL_Y1_PERCENT
-
-    return fitz.Rect(x0, y0, x1, y1)
-
-
-    # Process each page
     for page_index in range(len(src_doc)):
         page = src_doc[page_index]
         label_rect = get_label_rect(page)
 
-        if label_rect.is_empty or label_rect.height <= 0 or label_rect.width <= 0:
+        if label_rect.is_empty or label_rect.width <= 0 or label_rect.height <= 0:
             continue
 
-        new_page = out_doc.new_page(width=LABEL_WIDTH_PT, height=LABEL_HEIGHT_PT)
+        try:
+            # New 4×6 page
+            new_page = out_doc.new_page(width=LABEL_WIDTH_PT, height=LABEL_HEIGHT_PT)
 
-        src_w = label_rect.width
-        src_h = label_rect.height
+            src_w = label_rect.width
+            src_h = label_rect.height
 
-        # Scale uniformly to fit inside 4×6
-        scale_x = LABEL_WIDTH_PT / src_w
-        scale_y = LABEL_HEIGHT_PT / src_h
-        scale = min(scale_x, scale_y)
+            # Scale uniformly so the label fits inside 4×6
+            scale_x = LABEL_WIDTH_PT / src_w
+            scale_y = LABEL_HEIGHT_PT / src_h
+            scale = min(scale_x, scale_y)
 
-        dest_w = src_w * scale
-        dest_h = src_h * scale
+            dest_w = src_w * scale
+            dest_h = src_h * scale
 
-        dest_x0 = (LABEL_WIDTH_PT - dest_w) / 2
-        dest_y0 = (LABEL_HEIGHT_PT - dest_h) / 2
-        dest_x1 = dest_x0 + dest_w
-        dest_y1 = dest_y0 + dest_h
+            dest_x0 = (LABEL_WIDTH_PT - dest_w) / 2
+            dest_y0 = (LABEL_HEIGHT_PT - dest_h) / 2
+            dest_x1 = dest_x0 + dest_w
+            dest_y1 = dest_y0 + dest_h
 
-        dest_rect = fitz.Rect(dest_x0, dest_y0, dest_x1, dest_y1)
+            dest_rect = fitz.Rect(dest_x0, dest_y0, dest_x1, dest_y1)
 
-        new_page.show_pdf_page(dest_rect, src_doc, page_index, clip=label_rect)
+            # Copy only the label region
+            new_page.show_pdf_page(dest_rect, src_doc, page_index, clip=label_rect)
+            pages_added += 1
 
-    if len(out_doc) == 0:
-        raise HTTPException(status_code=400, detail="No label content found / crop rect invalid.")
+        except Exception:
+            # If anything goes wrong for this page, skip it instead of breaking the whole PDF
+            continue
+
+    # If no pages could be cropped, just return the original PDF (so it always loads)
+    if pages_added == 0:
+        src_doc.close()
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": 'attachment; filename="flipkart-labels-original.pdf"'
+            },
+        )
 
     out_bytes = out_doc.write()
     out_doc.close()
