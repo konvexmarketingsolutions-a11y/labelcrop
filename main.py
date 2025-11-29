@@ -22,10 +22,11 @@ app.add_middleware(
 # 0.0 = left / top edge of original page
 # 1.0 = right / bottom edge of original page
 # Start with these; we can tweak after it's returning a valid PDF.
-LABEL_X0_PERCENT = 0.27
-LABEL_X1_PERCENT = 0.72
-LABEL_Y0_PERCENT = 0.04
-LABEL_Y1_PERCENT = 0.42
+# Final tuned crop for Flipkart label on A4
+LABEL_X0_PERCENT = 0.26   # a bit more to the left
+LABEL_X1_PERCENT = 0.74   # a bit more to the right
+LABEL_Y0_PERCENT = 0.035  # slightly higher at the top
+LABEL_Y1_PERCENT = 0.425  # a bit higher at the bottom to remove extra text
 
 def get_label_rect(page: fitz.Page) -> fitz.Rect:
     """
@@ -91,6 +92,20 @@ async def crop_flipkart_label(file: UploadFile = File(...)):
         scale_y = LABEL_HEIGHT_PT / src_h
         scale = min(scale_x, scale_y)
 
+              dest_w = src_w * scale
+        dest_h = src_h * scale
+
+        # Add a safe print margin of 10 pt (~3.5 mm) on all sides
+        PADDING_PT = 10
+
+        max_w = LABEL_WIDTH_PT - 2 * PADDING_PT
+        max_h = LABEL_HEIGHT_PT - 2 * PADDING_PT
+
+        # Recompute scale to fit inside padded area
+        scale_x = max_w / src_w
+        scale_y = max_h / src_h
+        scale = min(scale_x, scale_y)
+
         dest_w = src_w * scale
         dest_h = src_h * scale
 
@@ -100,6 +115,7 @@ async def crop_flipkart_label(file: UploadFile = File(...)):
         dest_y1 = dest_y0 + dest_h
 
         dest_rect = fitz.Rect(dest_x0, dest_y0, dest_x1, dest_y1)
+
 
         new_page.show_pdf_page(dest_rect, src_doc, page_index, clip=label_rect)
         pages_added += 1
