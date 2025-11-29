@@ -7,8 +7,8 @@ app = FastAPI()
 
 # ⚠️ CHANGE THIS to your actual WordPress domain
 origins = [
-    "https://yourwordpresssite.com",
-    "https://www.yourwordpresssite.com"
+    "https://steelblue-newt-464495.hostingersite.com/",
+    "https://www.steelblue-newt-464495.hostingersite.com/"
 ]
 
 app.add_middleware(
