@@ -5,22 +5,20 @@ import fitz  # PyMuPDF
 
 app = FastAPI()
 
-# ⚠️ CHANGE THIS to your actual WordPress domain
-origins = [
-    "https://steelblue-newt-464495.hostingersite.com/",
-    "https://www.steelblue-newt-464495.hostingersite.com/"
-]
+# CORS – allow all origins (simple + safe for this tool)
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=False,   # no cookies/credentials needed
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 @app.post("/crop/flipkart-label")
 async def crop_flipkart_label(file: UploadFile = File(...)):
+    # Only accept PDF files
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Please upload a PDF file.")
 
@@ -31,6 +29,7 @@ async def crop_flipkart_label(file: UploadFile = File(...)):
     except Exception:
         raise HTTPException(status_code=400, detail="Could not open PDF.")
 
+    # 4×6 inches in PDF points (1 inch = 72 pt)
     LABEL_WIDTH_PT = 4 * 72
     LABEL_HEIGHT_PT = 6 * 72
 
@@ -41,7 +40,7 @@ async def crop_flipkart_label(file: UploadFile = File(...)):
         page_width = page_rect.width
         page_height = page_rect.height
 
-        # TEMP values (will tune later)
+        # TEMP values (we can tune later based on your red-marked region)
         margin_x = 15
         label_height = page_height * 0.45
         label_y_bottom = page_height - label_height
@@ -53,6 +52,7 @@ async def crop_flipkart_label(file: UploadFile = File(...)):
 
         return fitz.Rect(x0, y0, x1, y1)
 
+    # Process each page
     for page_index in range(len(src_doc)):
         page = src_doc[page_index]
         label_rect = get_label_rect(page)
@@ -65,6 +65,7 @@ async def crop_flipkart_label(file: UploadFile = File(...)):
         src_w = label_rect.width
         src_h = label_rect.height
 
+        # Scale uniformly to fit inside 4×6
         scale_x = LABEL_WIDTH_PT / src_w
         scale_y = LABEL_HEIGHT_PT / src_h
         scale = min(scale_x, scale_y)
