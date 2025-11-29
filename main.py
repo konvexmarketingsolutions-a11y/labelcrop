@@ -35,22 +35,27 @@ async def crop_flipkart_label(file: UploadFile = File(...)):
 
     out_doc = fitz.open()
 
+       # ---- DEFINE LABEL AREA AS PERCENTAGES OF THE PAGE ----
+    # You can tweak these 4 numbers to fine-tune the crop area.
+    # 0.0 = left/bottom edge, 1.0 = right/top edge of original A4 page.
+    LABEL_X0_PERCENT = 0.03   # left side of label
+    LABEL_Y0_PERCENT = 0.32   # bottom of label
+    LABEL_X1_PERCENT = 0.63   # right side of label
+    LABEL_Y1_PERCENT = 0.92   # top of label
+
     def get_label_rect(page):
+        """Return the rectangle of the shipping label on the original page."""
         page_rect = page.rect
         page_width = page_rect.width
         page_height = page_rect.height
 
-        # TEMP values (we can tune later based on your red-marked region)
-        margin_x = 15
-        label_height = page_height * 0.45
-        label_y_bottom = page_height - label_height
-
-        x0 = margin_x
-        y0 = label_y_bottom
-        x1 = page_width - margin_x
-        y1 = page_height
+        x0 = page_width  * LABEL_X0_PERCENT
+        y0 = page_height * LABEL_Y0_PERCENT
+        x1 = page_width  * LABEL_X1_PERCENT
+        y1 = page_height * LABEL_Y1_PERCENT
 
         return fitz.Rect(x0, y0, x1, y1)
+
 
     # Process each page
     for page_index in range(len(src_doc)):
